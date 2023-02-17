@@ -8,7 +8,7 @@ const CHANNELS: i32 = 2;
 const NUM_SECONDS: i32 = 5;
 const SAMPLE_RATE: f64 = 44_100.0;
 const FRAMES_PER_BUFFER: u32 = 64;
-const TABLE_SIZE: usize = 50;
+const TABLE_SIZE: usize = 100;
 
 fn main() {
     match run() {
@@ -33,7 +33,7 @@ fn run() -> Result<(), pa::Error> {
     }
     // let mut left_phase = 0;
     // let mut right_phase = 0;
-
+    let mut phase = 0;
 
     let pa = pa::PortAudio::new()?;
 
@@ -48,13 +48,18 @@ fn run() -> Result<(), pa::Error> {
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
         let mut idx = 0;
         for _ in 0..frames {
-            let new_value = (sine[0] + sine[1]) / 2.01;
+            let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.01;
             buffer[idx] = new_value;
             buffer[idx + 1] = new_value;
-            for i in 0..TABLE_SIZE - 1 {
-                sine[i] = sine[i+1];
+            // for i in 0..TABLE_SIZE - 1 {
+            //     sine[i] = sine[i+1];
+            // }
+            sine[(phase + TABLE_SIZE - 1) % TABLE_SIZE] = new_value;
+
+            phase += 1;
+            if phase >= TABLE_SIZE {
+                phase -= TABLE_SIZE;
             }
-            sine[TABLE_SIZE - 1] = new_value;
 
             // buffer[idx] = sine[left_phase];
             // buffer[idx + 1] = sine[right_phase];
