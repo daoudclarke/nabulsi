@@ -8,7 +8,7 @@ const CHANNELS: i32 = 2;
 const NUM_SECONDS: i32 = 1;
 const SAMPLE_RATE: f64 = 44_100.0;
 const FRAMES_PER_BUFFER: u32 = 64;
-const TABLE_SIZE: usize = 100;
+const TABLE_SIZE: usize = 300;
 
 fn main() {
     match run() {
@@ -49,7 +49,7 @@ fn run() -> Result<(), pa::Error> {
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
         for i in 0..frames {
             count += 1;
-            let speed = if count > 10000 { 3 } else { 1 };
+            let speed = if count > 10000 { 3 } else { 2 };
 
             let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.01;
             for _ in 0..speed {
