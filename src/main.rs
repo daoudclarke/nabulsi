@@ -1,65 +1,77 @@
-extern crate csound;
 
-use csound::{Csound};
+extern crate portaudio;
+
+use portaudio as pa;
+use std::f64::consts::PI;
+
+const CHANNELS: i32 = 2;
+const NUM_SECONDS: i32 = 5;
+const SAMPLE_RATE: f64 = 44_100.0;
+const FRAMES_PER_BUFFER: u32 = 64;
+const TABLE_SIZE: usize = 200;
 
 fn main() {
-    let csound = Csound::new();
-    csound.set_option("-odac").unwrap(); // Use default audio device
+    match run() {
+        Ok(_) => {}
+        e => {
+            eprintln!("Example failed with the following: {:?}", e);
+        }
+    }
+}
 
-    // Define a simple Csound score that plays a sine wave
-    let score = "
-        i1 0 1 440
-    ";
+fn run() -> Result<(), pa::Error> {
+    println!(
+        "PortAudio Test: output sine wave. SR = {}, BufSize = {}",
+        SAMPLE_RATE, FRAMES_PER_BUFFER
+    );
 
-    // Compile and start Csound
-    csound.compile_csd_text("
-<CsoundSynthesizer>;
-  ; test.csd - a Csound structured data file
+    // Initialise sinusoidal wavetable.
+    let mut sine = [0.0; TABLE_SIZE];
+    for i in 0..TABLE_SIZE {
+        sine[i] = (i as f64 / TABLE_SIZE as f64 * PI * 2.0).sin() as f32;
+    }
+    let mut left_phase = 0;
+    let mut right_phase = 0;
 
-<CsOptions>
-  -W -d -o tone.wav
-</CsOptions>
+    let pa = pa::PortAudio::new()?;
 
-<CsVersion>    ; optional section
-  Before 4.10  ; these two statements check for
-  After 4.08   ; Csound version 4.09
-</CsVersion>
+    let mut settings =
+        pa.default_output_stream_settings(CHANNELS, SAMPLE_RATE, FRAMES_PER_BUFFER)?;
+    // we won't output out of range samples so don't bother clipping them.
+    settings.flags = pa::stream_flags::CLIP_OFF;
 
-<CsInstruments>
-  ; originally tone.orc
-  sr = 44100
-  kr = 4410
-  ksmps = 10
-  nchnls = 1
-  instr   1
-      a1 oscil p4, p5, 1 ; simple oscillator
-         out a1
-  endin
-</CsInstruments>
+    // This routine will be called by the PortAudio engine when audio is needed. It may called at
+    // interrupt level on some machines so don't do anything that could mess up the system like
+    // dynamic resource allocation or IO.
+    let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
+        let mut idx = 0;
+        for _ in 0..frames {
+            buffer[idx] = sine[left_phase];
+            buffer[idx + 1] = sine[right_phase];
+            left_phase += 1;
+            if left_phase >= TABLE_SIZE {
+                left_phase -= TABLE_SIZE;
+            }
+            right_phase += 3;
+            if right_phase >= TABLE_SIZE {
+                right_phase -= TABLE_SIZE;
+            }
+            idx += 2;
+        }
+        pa::Continue
+    };
 
-<CsScore>
-  ; originally tone.sco
-  f1 0 8192 10 1
-  i1 0 1 20000 1000 ; play one second of one kHz tone
-  e
-</CsScore>
+    let mut stream = pa.open_non_blocking_stream(settings, callback)?;
 
-</CsoundSynthesizer>
-    ").unwrap();
-    csound.start().unwrap();
+    stream.start()?;
 
-    // Send the score to Csound
-    csound.read_score(score).unwrap();
+    println!("Play for {} seconds.", NUM_SECONDS);
+    pa.sleep(NUM_SECONDS * 1_000);
 
-    // // Read the output from the message channel and print it to the console
-    // let mut message_channel = csound.message_channel().unwrap();
-    // loop {
-    //     match message_channel.try_recv() {
-    //         Ok(message) => println!("{}", message),
-    //         Err(_) => break,
-    //     }
-    // }
+    stream.stop()?;
+    stream.close()?;
 
-    // Stop and cleanup Csound
-    csound.stop();
+    println!("Test finished.");
+
+    Ok(())
 }

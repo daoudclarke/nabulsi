@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-csound = "^0.1.5"
+portaudio = "0.7.0"
+num = "0.4.0"
+
+# csound = "^0.1.5"
 # csound-sys = "0.1.2"
