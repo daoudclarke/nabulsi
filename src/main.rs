@@ -5,7 +5,7 @@ use portaudio as pa;
 // use std::f64::consts::PI;
 
 const CHANNELS: i32 = 2;
-const NUM_SECONDS: i32 = 5;
+const NUM_SECONDS: i32 = 1;
 const SAMPLE_RATE: f64 = 44_100.0;
 const FRAMES_PER_BUFFER: u32 = 64;
 const TABLE_SIZE: usize = 100;
@@ -34,6 +34,7 @@ fn run() -> Result<(), pa::Error> {
     // let mut left_phase = 0;
     // let mut right_phase = 0;
     let mut phase = 0;
+    let mut count = 0;
 
     let pa = pa::PortAudio::new()?;
 
@@ -46,32 +47,22 @@ fn run() -> Result<(), pa::Error> {
     // interrupt level on some machines so don't do anything that could mess up the system like
     // dynamic resource allocation or IO.
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
-        let mut idx = 0;
-        for _ in 0..frames {
-            let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.01;
-            buffer[idx] = new_value;
-            buffer[idx + 1] = new_value;
-            // for i in 0..TABLE_SIZE - 1 {
-            //     sine[i] = sine[i+1];
-            // }
-            sine[(phase + TABLE_SIZE - 1) % TABLE_SIZE] = new_value;
+        for i in 0..frames {
+            count += 1;
+            let speed = if count > 10000 { 3 } else { 1 };
 
-            phase += 1;
-            if phase >= TABLE_SIZE {
-                phase -= TABLE_SIZE;
+            let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.01;
+            for _ in 0..speed {
+                sine[(phase + TABLE_SIZE - 1) % TABLE_SIZE] = new_value;
+
+                phase += 1;
+                if phase >= TABLE_SIZE {
+                    phase -= TABLE_SIZE;
+                }
             }
 
-            // buffer[idx] = sine[left_phase];
-            // buffer[idx + 1] = sine[right_phase];
-            // left_phase += 1;
-            // if left_phase >= TABLE_SIZE {
-            //     left_phase -= TABLE_SIZE;
-            // }
-            // right_phase += 3;
-            // if right_phase >= TABLE_SIZE {
-            //     right_phase -= TABLE_SIZE;
-            // }
-            idx += 2;
+            buffer[i*2] = new_value;
+            buffer[i*2 + 1] = new_value;
         }
         pa::Continue
     };
