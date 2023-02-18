@@ -2,10 +2,10 @@
 extern crate portaudio;
 
 use portaudio as pa;
-// use std::f64::consts::PI;
+use std::f64::consts::PI;
 
 const CHANNELS: i32 = 2;
-const NUM_SECONDS: i32 = 1;
+const NUM_SECONDS: i32 = 5;
 const SAMPLE_RATE: f64 = 44_100.0;
 const FRAMES_PER_BUFFER: u32 = 64;
 const TABLE_SIZE: usize = 300;
@@ -43,16 +43,25 @@ fn run() -> Result<(), pa::Error> {
     // we won't output out of range samples so don't bother clipping them.
     settings.flags = pa::stream_flags::CLIP_OFF;
 
+    let mut loc = 0.0;
+    let mut loc_int = 0;
+
     // This routine will be called by the PortAudio engine when audio is needed. It may called at
     // interrupt level on some machines so don't do anything that could mess up the system like
     // dynamic resource allocation or IO.
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
         for i in 0..frames {
             count += 1;
-            let speed = if count > 10000 { 3 } else { 2 };
+            // let speed = if count > 10000 { 3 } else { 2 };
+            // let speed = (count as f64 / 70000.0) + 2.0;
+            let speed = 2.0 + (count as f64 / 10000.0 * PI * 2.0).sin() * (10000.0 / (count as f64 + 100000.0));
+            loc += speed;
 
-            let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.01;
-            for _ in 0..speed {
+            let new_iterations = loc as i32 - loc_int;
+            loc_int = loc as i32;
+
+            let new_value = (sine[phase] + sine[(phase + 1) % TABLE_SIZE]) / 2.001;
+            for _ in 0..new_iterations {
                 sine[(phase + TABLE_SIZE - 1) % TABLE_SIZE] = new_value;
 
                 phase += 1;
